@@ -30,14 +30,10 @@ timer_value = 0
 timer_text_id = None
 waiting_for_green = False
 timer_running = False
+green_duration = 25
+red_duration = 20
 simulation_started = False
 last_update_time = 0
-
-# ⚙️ Новые параметры из ТЗ
-yellow_duration = 30          # Жёлтый свет — 30 сек
-red_driver_duration = 180     # Красный для авто — 3 минуты
-green_pedestrian_duration = 120  # Зелёный для пешеходов — 2 минуты
-button_locked = False         # Блокировка кнопки
 
 # Переменные для машин
 cars = []
@@ -164,7 +160,7 @@ class Pedestrian:
             if pedestrian_light_state == "green" and timer_value > 2:
                 self.state = "crossing_road"
                 distance_to_cross = road_height
-                self.crossing_speed = distance_to_cross / (green_pedestrian_duration * 10)
+                self.crossing_speed = distance_to_cross / (green_duration * 10)
         elif self.state == "crossing_road":
             if self.y > self.crosswalk_center_y - road_height // 2:
                 if timer_value > self.hurry_threshold:
@@ -213,15 +209,6 @@ def load_pedestrian_models(canvas):
 # 👩‍🎓 Аня — конец
 
 
-# 👩‍💻 Утилита для обновления кнопки пешехода
-def update_pedestrian_button():
-    """Обновляет внешний вид кнопки в зависимости от состояния"""
-    if button_locked:
-        pedestrian_button.config(state="disabled", bg="lightgray")
-    else:
-        pedestrian_button.config(state="normal", bg="#ccffcc")
-
-
 # 👩‍💼 Сергей (тимлид) — начало
 # Функции для кнопок
 def start_simulation():
@@ -233,10 +220,6 @@ def start_simulation():
     last_update_time = time.time()
     last_car_spawn_time = time.time()
     load_pedestrian_models(canvas)
-    
-    # 🔹 Восстанавливаем цвет кнопки при старте
-    update_pedestrian_button()
-    
     update_lights()
     move_cars()
     spawn_cars()
@@ -244,44 +227,41 @@ def start_simulation():
     print("Симуляция начата")
 
 
-def pause_simulation():
+# ❌ УДАЛЕНА ФУНКЦИЯ open_settings()
+
+
+def pause_resume_simulation():
+    """Объединённая функция для паузы и продолжения"""
     global timer_running
     if not simulation_started:
         messagebox.showinfo("Внимание", "Необходимо начать симуляцию")
         return
-    timer_running = False
-    print("Симуляция приостановлена")
 
-
-def resume_simulation():
-    global timer_running, last_update_time
-    if not simulation_started:
-        messagebox.showinfo("Внимание", "Необходимо начать симуляцию")
-        return
     if timer_running:
-        return
-    timer_running = True
-    last_update_time = time.time()
-    update_lights()
-    move_cars()
-    spawn_cars()
-    spawn_pedestrians()
-    print("Симуляция продолжается")
+        # Ставим на паузу
+        timer_running = False
+        pause_resume_button.config(text="Продолжить")
+        print("Симуляция приостановлена")
+    else:
+        # Продолжаем
+        timer_running = True
+        last_update_time = time.time()
+        update_lights()
+        move_cars()
+        spawn_cars()
+        spawn_pedestrians()
+        pause_resume_button.config(text="Пауза")
+        print("Симуляция продолжается")
 
 
 def stop_simulation():
-    global timer_running, pedestrian_light_state, driver_light_state, timer_value, waiting_for_green, simulation_started, cars, pedestrians, button_locked
+    global timer_running, pedestrian_light_state, driver_light_state, timer_value, waiting_for_green, simulation_started, cars, pedestrians
     timer_running = False
     simulation_started = False
     pedestrian_light_state = "red"
     driver_light_state = "green"
     timer_value = 0
     waiting_for_green = False
-    button_locked = False
-    
-    # 🔹 Сбрасываем всё, но сохраняем красивый цвет
-    update_pedestrian_button()
-    
     update_lights()
     for car in cars:
         canvas.delete(car.id)
@@ -293,53 +273,15 @@ def stop_simulation():
 # 👩‍💼 Сергей (тимлид) — конец
 
 
-# 🧪 Дина (инженер тестировщик) — начало
-def open_settings():
-    global yellow_duration, red_driver_duration, green_pedestrian_duration
-    settings_window = tk.Toplevel(root)
-    settings_window.title("Настройки")
+# ❌ УДАЛЕН БЛОК open_settings()
 
-    tk.Label(settings_window, text="Длительность жёлтого сигнала (сек):").grid(row=0, column=0, padx=5, pady=5)
-    yellow_entry = tk.Entry(settings_window)
-    yellow_entry.insert(0, str(yellow_duration))
-    yellow_entry.grid(row=0, column=1, padx=5, pady=5)
-
-    tk.Label(settings_window, text="Длительность красного для авто (сек):").grid(row=1, column=0, padx=5, pady=5)
-    red_entry = tk.Entry(settings_window)
-    red_entry.insert(0, str(red_driver_duration))
-    red_entry.grid(row=1, column=1, padx=5, pady=5)
-
-    tk.Label(settings_window, text="Длительность зелёного для пешеходов (сек):").grid(row=2, column=0, padx=5, pady=5)
-    green_entry = tk.Entry(settings_window)
-    green_entry.insert(0, str(green_pedestrian_duration))
-    green_entry.grid(row=2, column=1, padx=5, pady=5)
-
-    def save_settings():
-        global yellow_duration, red_driver_duration, green_pedestrian_duration
-        try:
-            new_yellow = int(yellow_entry.get())
-            new_red = int(red_entry.get())
-            new_green = int(green_entry.get())
-            if new_yellow <= 0 or new_red <= 0 or new_green <= 0:
-                raise ValueError("Значения должны быть положительными")
-            yellow_duration = new_yellow
-            red_driver_duration = new_red
-            green_pedestrian_duration = new_green
-            settings_window.destroy()
-            messagebox.showinfo("Настройки сохранены",
-                                "Для применения новых настроек необходимо перезапустить симуляцию")
-        except ValueError:
-            messagebox.showerror("Ошибка", "Пожалуйста, введите положительные целые числа")
-
-    tk.Button(settings_window, text="Сохранить", command=save_settings).grid(row=3, column=0, columnspan=2, pady=10)
-# 🧪 Дина (инженер тестировщик) — конец
 
 def exit_application():
     if messagebox.askokcancel("Выход", "Вы уверены, что хотите выйти?"):
         root.quit()
 
 # 👩‍💻 Дарья Лексина — начало
-# Кнопки в меню
+# Кнопки в меню — БЕЗ "Настройки", с объединённой кнопкой
 buttons = {
     "Начать симуляцию": start_simulation,
     "Закончить симуляцию": stop_simulation,
@@ -348,8 +290,12 @@ buttons = {
 
 # Создаем и размещаем кнопки
 for btn_text, func in buttons.items():
-    button = tk.Button(menu_frame, text=btn_text, command=func, font=("Arial", 15), height=2, width=20)
+    button = tk.Button(menu_frame, text=btn_text, command=func, font=("Arial", 12), height=2, width=20)
     button.pack(pady=5)
+
+# Добавляем ОДНУ кнопку для паузы/продолжения
+pause_resume_button = tk.Button(menu_frame, text="Пауза", command=pause_resume_simulation, font=("Arial", 12), height=2, width=20)
+pause_resume_button.pack(pady=5)
 # 👩‍💻 Дарья Лексина — конец
 
 # 👨‍💻 Никита Лаптев — начало
@@ -409,78 +355,55 @@ def draw_crosswalk():
 
 # 👩‍🎓 Аня — начало
 def start_pedestrian_timer():
-    global pedestrian_light_state, driver_light_state, timer_value, waiting_for_green, timer_running, button_locked
+    global pedestrian_light_state, timer_value, waiting_for_green, timer_running
     if not simulation_started:
         messagebox.showinfo("Внимание", "Необходимо начать симуляцию")
         return
     if not timer_running:
         messagebox.showinfo("Внимание", "Необходимо продолжить симуляцию или начать заново")
         return
-    if button_locked:
-        messagebox.showinfo("Внимание", "Кнопка заблокирована на 2 минуты")
-        return
     if pedestrian_light_state == "red" and not waiting_for_green and timer_running:
         waiting_for_green = True
-        timer_value = yellow_duration  # Начинаем с жёлтого
-        driver_light_state = "yellow"  # Включаем жёлтый
-        button_locked = True
-        update_pedestrian_button()  # 🔹 Обновляем кнопку: серая и неактивная
+        timer_value = red_duration
         update_lights()
 # 👩‍🎓 Аня — конец
 
 
 # 👨‍💻 Никита Кочнев — начало
 def update_lights():
-    global timer_value, pedestrian_light_state, driver_light_state, timer_text_id, waiting_for_green, timer_running, last_update_time, button_locked
+    global timer_value, pedestrian_light_state, driver_light_state, timer_text_id, waiting_for_green, timer_running, last_update_time
+    canvas.delete("pedestrian_light", "driver_light")
 
     current_time = time.time()
     elapsed_time = current_time - last_update_time
     last_update_time = current_time
 
-    # 💡 Мигание таймера при остатке <= 5 секунд
-    if timer_running or pedestrian_light_state == "green":
-        color = "green" if pedestrian_light_state == "green" else "red"
-        # Мигание: чередуем цвет каждые 0.5 сек
-        if timer_value <= 5:
-            blink_phase = int(timer_value * 2) % 2
-            if blink_phase == 0:
-                color = "white"  # или "orange"
-        if timer_text_id is None:
-            timer_text_id = canvas.create_text(pedestrian_light_x + 75, pedestrian_light_y + 25,
-                                               text=f"{timer_value:.1f}", font=("Arial", 16), fill=color, tags="timer")
-        else:
-            canvas.itemconfigure(timer_text_id, text=f"{timer_value:.1f}", fill=color)
-    else:
-        if timer_text_id is not None:
-            canvas.itemconfigure(timer_text_id, text=f"{timer_value:.1f}")
+    if pedestrian_light_state == "red":
+        canvas.create_oval(pedestrian_light_x + 5, pedestrian_light_y + 5, pedestrian_light_x + 40,
+                           pedestrian_light_y + 40, fill="red", tags="pedestrian_light")
+        if waiting_for_green and timer_running:
+            timer_value -= elapsed_time
+            if timer_value <= 3:
+                driver_light_state = "yellow"
+            if timer_value <= 0:
+                pedestrian_light_state = "green"
+                driver_light_state = "red"
+                timer_value = green_duration
+                canvas.delete("pedestrian_light")
+                canvas.create_oval(pedestrian_light_x + 115, pedestrian_light_y + 5, pedestrian_light_x + 150,
+                                   pedestrian_light_y + 40, fill="green", tags="pedestrian_light")
+    elif pedestrian_light_state == "green":
+        canvas.create_oval(pedestrian_light_x + 115, pedestrian_light_y + 5, pedestrian_light_x + 150,
+                           pedestrian_light_y + 40, fill="green", tags="pedestrian_light")
+        if timer_running:
+            timer_value -= elapsed_time
+            if timer_value <= 0:
+                pedestrian_light_state = "red"
+                driver_light_state = "green"
+                timer_value = 0
+                waiting_for_green = False
 
-    # 🔄 Основная логика автомата
-    if waiting_for_green and timer_running:
-        timer_value -= elapsed_time
-
-        # Этап 1: жёлтый для авто
-        if driver_light_state == "yellow" and timer_value <= 0:
-            driver_light_state = "red"
-            timer_value = red_driver_duration  # 3 минуты красного
-
-        # Этап 2: через 30 сек от начала красного — зелёный для пешеходов
-        elif driver_light_state == "red" and timer_value <= red_driver_duration - 30 and pedestrian_light_state == "red":
-            pedestrian_light_state = "green"
-            timer_value = green_pedestrian_duration  # 2 минуты
-
-        # Этап 3: конец зелёного для пешеходов
-        elif pedestrian_light_state == "green" and timer_value <= 0:
-            pedestrian_light_state = "red"
-            timer_value = 30  # 30 секунд красного для пешеходов
-
-        # Этап 4: возврат к зелёному для авто
-        elif pedestrian_light_state == "red" and timer_value <= 0:
-            driver_light_state = "green"
-            waiting_for_green = False
-            button_locked = False
-            update_pedestrian_button()  # 🔹 Разблокируем кнопку
-
-    # Обновляем светофоры
+    # Обновляем светофоры для водителей
     draw_driver_lights()
 
     # Обновляем пешеходов
@@ -489,7 +412,24 @@ def update_lights():
             pedestrian.waiting = False
         pedestrian.move()
     pedestrians[:] = [p for p in pedestrians if p.state != "crossed"]
+# 👨‍💻 Никита Кочнев — конец
 
+
+# 👩‍💻 Дарья Лексина — начало
+    if timer_running or pedestrian_light_state == "green":
+        color = "green" if pedestrian_light_state == "green" else "red"
+        if timer_text_id is None:
+            timer_text_id = canvas.create_text(pedestrian_light_x + 75, pedestrian_light_y + 25,
+                                               text=f"{timer_value:.1f}", font=("Arial", 16), fill=color, tags="timer")
+        else:
+            canvas.itemconfigure(timer_text_id, text=f"{timer_value:.1f}", fill=color)
+    else:
+        if timer_text_id is not None:
+            canvas.itemconfigure(timer_text_id, text=f"{timer_value:.1f}")
+# 👩‍💻 Дарья Лексина — конец
+
+
+# 👨‍💻 Никита Кочнев — начало
     if timer_running:
         canvas.after(100, update_lights)
     else:
@@ -504,13 +444,26 @@ def update_lights():
                                pedestrian_light_y + 40, fill="black", tags="pedestrian_light")
             canvas.create_oval(pedestrian_light_x + 115, pedestrian_light_y + 5, pedestrian_light_x + 150,
                                pedestrian_light_y + 40, fill="green", tags="pedestrian_light")
+# 👨‍💻 Никита Кочнев — конец
 
+
+# 👨‍💻 Никита Лаптев — начало
     # Устанавливаем порядок слоев
     canvas.tag_raise("traffic_light")
     canvas.tag_raise("timer")
     canvas.tag_raise("pedestrian_light")
     canvas.tag_raise("driver_light")
-# 👨‍💻 Никита Кочнев — конец
+# 👨‍💻 Никита Лаптев — конец
+
+
+# 👩‍💻 Дарья Лексина — начало
+# Добавляем кнопку для пешеходного светофора
+button_frame = tk.Frame(menu_frame)
+button_frame.pack(pady=20)
+
+pedestrian_button = tk.Button(button_frame, text="Переключить пешеходный свет", command=start_pedestrian_timer)
+pedestrian_button.pack()
+# 👩‍💻 Дарья Лексина — конец
 
 
 # 👨‍💻 Никита Лаптев — начало
@@ -531,15 +484,15 @@ def draw_traffic_lights():
     canvas.create_rectangle(driver_light_x_right, driver_light_y, driver_light_x_right + 30, driver_light_y + 90,
                             fill="black", tags="traffic_light")
 
-    pedestrian_light_x = canvas_width // 2 - 60
-    pedestrian_light_y = line_y - 30
-    canvas.create_rectangle(pedestrian_light_x, pedestrian_light_y, pedestrian_light_x + 155, pedestrian_light_y + 45,
+    pedestrian_light_x = canvas_width // 2 - 130
+    pedestrian_light_y = line_y - 250
+    canvas.create_rectangle(pedestrian_light_x, pedestrian_light_y, pedestrian_light_x + 45, pedestrian_light_y + 100,
                             fill="black", tags="traffic_light")
 
     canvas.create_oval(pedestrian_light_x + 5, pedestrian_light_y + 5, pedestrian_light_x + 40,
                        pedestrian_light_y + 40, fill="red", tags="pedestrian_light")
-    canvas.create_oval(pedestrian_light_x + 115, pedestrian_light_y + 5, pedestrian_light_x + 150,
-                       pedestrian_light_y + 40, fill="black", tags="pedestrian_light")
+    canvas.create_oval(pedestrian_light_x + 5, pedestrian_light_y + 50, pedestrian_light_x + 40,
+                       pedestrian_light_y + 85, fill="black", tags="pedestrian_light")
 
     draw_driver_lights()
 
@@ -692,24 +645,6 @@ def move_cars():
     if timer_running:
         canvas.after(50, move_cars)
 # 👨‍💻 Марсель — конец
-
-
-# 👩‍💻 Дарья Лексина — начало
-# Добавляем кнопку для пешеходного светофора
-button_frame = tk.Frame(menu_frame)
-button_frame.pack(pady=20)
-
-pedestrian_button = tk.Button(
-    button_frame,
-    text="Включить пешеходный светофор",
-    command=start_pedestrian_timer,
-    width=28,
-    height=2,
-    bg="#ccffcc",
-    font=("Arial", 11, "bold")
-)
-pedestrian_button.pack()
-# 👩‍💻 Дарья Лексина — конец
 
 
 # 👩‍💼 Сергей (тимлид) — начало
