@@ -129,58 +129,74 @@ class Car:
 class Pedestrian:
     def __init__(self, canvas, image_path, x, y):
         self.canvas = canvas
-        self.image = PhotoImage(file=image_path)
-        self.image = self.image.subsample(10, 10)
-        self.id = canvas.create_image(x, y, image=self.image, tags="pedestrian")
-        self.x = x
-        self.y = y
-        self.state = "walking_to_crosswalk"
-        self.target_y = canvas.winfo_height() // 2 + road_height // 2 + 20
+        self.sprite = PhotoImage(file=image_path).subsample(10, 10)
+        self.id = canvas.create_image(x, y, image=self.sprite, tags="pedestrian")
+
+        # Позиция и движение
+        self.x, self.y = x, y
         self.crosswalk_center_y = canvas.winfo_height() // 2
-        self.normal_speed = 2
-        self.crossing_speed = self.normal_speed
-        self.current_speed = self.normal_speed
+        self.target_y = self.crosswalk_center_y + road_height // 2 + 20
+
+        self.base_speed = 2
+        self.current_speed = self.base_speed
+        self.crossing_speed = self.base_speed
         self.acceleration = 0.1
-        self.x_offset = random.uniform(-0.5, 0.5)
-        self.relaxed_speed = self.normal_speed * 0.7
+        self.x_shift = random.uniform(-0.5, 0.5)
+
+        # Поведение и ограничения
+        self.relaxed_speed = self.base_speed * 0.7
         self.hurry_threshold = 5
+        self.state = "walking_to_crosswalk"
+        self.min_x = 50
+        self.max_x = canvas.winfo_width() - 50
 
     def move(self):
         global timer_value, pedestrian_light_state
+
+        # === Идёт к переходу ===
         if self.state == "walking_to_crosswalk":
             if self.y > self.target_y:
-                self.current_speed = min(self.current_speed + self.acceleration, self.normal_speed)
-                self.canvas.move(self.id, self.x_offset, -self.current_speed)
-                self.x += self.x_offset
-                self.y -= self.current_speed
+                self.current_speed = min(self.current_speed + self.acceleration, self.base_speed)
+                new_x = max(self.min_x, min(self.max_x, self.x + self.x_shift))
+                self.canvas.move(self.id, new_x - self.x, -self.current_speed)
+                self.x, self.y = new_x, self.y - self.current_speed
             else:
                 self.state = "waiting_at_crosswalk"
                 self.current_speed = 0
+
+        # === Ждёт зелёного и >5 секунд ===
         elif self.state == "waiting_at_crosswalk":
-            if pedestrian_light_state == "green" and timer_value > 2:
+            if pedestrian_light_state == "green" and timer_value > 7:
                 self.state = "crossing_road"
-                distance_to_cross = road_height
-                self.crossing_speed = distance_to_cross / (green_duration * 10)
+                distance = road_height
+                self.crossing_speed = distance / (green_duration * 10)
+
+        # === Переходит ===
         elif self.state == "crossing_road":
             if self.y > self.crosswalk_center_y - road_height // 2:
                 if timer_value > self.hurry_threshold:
                     self.current_speed = min(self.current_speed + self.acceleration, self.relaxed_speed)
-                elif timer_value <= self.hurry_threshold:
+                else:
                     self.current_speed = min(self.current_speed + self.acceleration * 2, self.crossing_speed * 1.5)
-                self.canvas.move(self.id, 0, -self.current_speed)
-                self.y -= self.current_speed
+                new_x = max(self.min_x, min(self.max_x, self.x))
+                self.canvas.move(self.id, new_x - self.x, -self.current_speed)
+                self.x, self.y = new_x, self.y - self.current_speed
             else:
                 self.state = "leaving_scene"
-                self.current_speed = self.normal_speed
+                self.current_speed = self.base_speed
+
+        # === Уходит с экрана ===
         elif self.state == "leaving_scene":
             if self.y > 0:
-                target_speed = self.normal_speed * 0.5
+                target_speed = self.base_speed * 0.5
                 if self.current_speed > target_speed:
                     self.current_speed = max(self.current_speed - self.acceleration, target_speed)
-                self.canvas.move(self.id, self.x_offset, -self.current_speed)
-                self.x += self.x_offset
-                self.y -= self.current_speed
+                new_x = max(self.min_x, min(self.max_x, self.x + self.x_shift))
+                self.canvas.move(self.id, new_x - self.x, -self.current_speed)
+                self.x, self.y = new_x, self.y - self.current_speed
             else:
+                # Удаляем с холста и помечаем как завершённого
+                self.canvas.delete(self.id)
                 self.state = "crossed"
 # 👩‍🎓 Аня — конец
 
@@ -227,28 +243,29 @@ def start_simulation():
     print("Симуляция начата")
 
 
-def pause_resume_simulation():
-    """Объединённая функция для паузы и продолжения"""
+def pause_simulation():
     global timer_running
     if not simulation_started:
         messagebox.showinfo("Внимание", "Необходимо начать симуляцию")
         return
+    timer_running = False
+    print("Симуляция приостановлена")
 
+
+def resume_simulation():
+    global timer_running, last_update_time
+    if not simulation_started:
+        messagebox.showinfo("Внимание", "Необходимо начать симуляцию")
+        return
     if timer_running:
-        # Ставим на паузу
-        timer_running = False
-        pause_resume_button.config(text="Продолжить")
-        print("Симуляция приостановлена")
-    else:
-        # Продолжаем
-        timer_running = True
-        last_update_time = time.time()
-        update_lights()
-        move_cars()
-        spawn_cars()
-        spawn_pedestrians()
-        pause_resume_button.config(text="Пауза")
-        print("Симуляция продолжается")
+        return
+    timer_running = True
+    last_update_time = time.time()
+    update_lights()
+    move_cars()
+    spawn_cars()
+    spawn_pedestrians()
+    print("Симуляция продолжается")
 
 
 def stop_simulation():
@@ -270,15 +287,56 @@ def stop_simulation():
 # 👩‍💼 Сергей (тимлид) — конец
 
 
+# 🧪 Дина (инженер тестировщик) — начало
+def open_settings():
+    global green_duration, red_duration
+    settings_window = tk.Toplevel(root)
+    settings_window.title("Настройки")
+
+    tk.Label(settings_window, text="Длительность зеленого сигнала (в секундах):").grid(row=0, column=0, padx=5, pady=5)
+    green_entry = tk.Entry(settings_window)
+    green_entry.insert(0, str(green_duration))
+    green_entry.grid(row=0, column=1, padx=5, pady=5)
+
+    tk.Label(settings_window, text="Длительность красного сигнала (в секундах):").grid(row=1, column=0, padx=5, pady=5)
+    red_entry = tk.Entry(settings_window)
+    red_entry.insert(0, str(red_duration))
+    red_entry.grid(row=1, column=1, padx=5, pady=5)
+
+    def save_settings():
+        global green_duration, red_duration
+        try:
+            new_green_duration = int(green_entry.get())
+            new_red_duration = int(red_entry.get())
+            if new_green_duration <= 0 or new_red_duration <= 0:
+                raise ValueError("Значения должны быть положительными")
+            green_duration = new_green_duration
+            red_duration = new_red_duration
+            for pedestrian in pedestrians:
+                if pedestrian.state == "crossing_road":
+                    distance_to_cross = road_height
+                    pedestrian.speed = distance_to_cross / (green_duration * 10)
+            settings_window.destroy()
+            messagebox.showinfo("Настройки сохранены",
+                                "Для применения новых настроек необходимо перезапустить симуляцию")
+        except ValueError:
+            messagebox.showerror("Ошибка", "Пожалуйста, введите положительные целые числа (отличные от нуля)")
+
+    tk.Button(settings_window, text="Сохранить", command=save_settings).grid(row=2, column=0, columnspan=2, pady=10)
+# 🧪 Дина (инженер тестировщик) — конец
+
 def exit_application():
     if messagebox.askokcancel("Выход", "Вы уверены, что хотите выйти?"):
         root.quit()
 
 # 👩‍💻 Дарья Лексина — начало
-# Кнопки в меню — БЕЗ "Настройки", с объединённой кнопкой
+# Кнопки в меню
 buttons = {
     "Начать симуляцию": start_simulation,
+    "Приостановить": pause_simulation,
+    "Продолжить": resume_simulation,
     "Закончить симуляцию": stop_simulation,
+    "Настройки": open_settings,
     "Выход": exit_application,
 }
 
@@ -286,10 +344,6 @@ buttons = {
 for btn_text, func in buttons.items():
     button = tk.Button(menu_frame, text=btn_text, command=func, font=("Arial", 12), height=2, width=20)
     button.pack(pady=5)
-
-# Добавляем ОДНУ кнопку для паузы/продолжения
-pause_resume_button = tk.Button(menu_frame, text="Пауза", command=pause_resume_simulation, font=("Arial", 12), height=2, width=20)
-pause_resume_button.pack(pady=5)
 # 👩‍💻 Дарья Лексина — конец
 
 # 👨‍💻 Никита Лаптев — начало
@@ -365,51 +419,72 @@ def start_pedestrian_timer():
 
 # 👨‍💻 Никита Кочнев — начало
 def update_lights():
-    global timer_value, pedestrian_light_state, driver_light_state, timer_text_id, waiting_for_green, timer_running, last_update_time
-    # ❌ УДАЛЕНО: canvas.delete("pedestrian_light", "driver_light")
+    global timer_value, pedestrian_light_state, driver_light_state
+    global timer_text_id, waiting_for_green, timer_running, last_update_time
 
-    current_time = time.time()
-    elapsed_time = current_time - last_update_time
-    last_update_time = current_time
+    # Удаляем старые элементы светофоров
+    canvas.delete("driver_light", "pedestrian_light")
 
+    now = time.time()
+    delta = now - last_update_time
+    last_update_time = now
+
+    # === Обработка состояния пешеходного светофора ===
     if pedestrian_light_state == "red":
-        # Обновляем цвета сигналов
-        canvas.itemconfigure("pedestrian_red", fill="red")
-        canvas.itemconfigure("pedestrian_green", fill="black")
-        if waiting_for_green and timer_running:
-            timer_value -= elapsed_time
-            if timer_value <= 3:
+        # Красный сигнал для пешеходов
+        canvas.create_oval(
+            pedestrian_light_x + 5, pedestrian_light_y + 5,
+            pedestrian_light_x + 40, pedestrian_light_y + 40,
+            fill="red", tags="pedestrian_light"
+        )
+
+        if timer_running and waiting_for_green:
+            timer_value -= delta
+
+            # Переходный этап — желтый свет для водителей
+            if timer_value <= 3 and driver_light_state != "yellow":
                 driver_light_state = "yellow"
+
+            # Смена сигналов при истечении таймера
             if timer_value <= 0:
-                pedestrian_light_state = "green"
-                driver_light_state = "red"
+                pedestrian_light_state, driver_light_state = "green", "red"
                 timer_value = green_duration
-                # Переключаем сигналы
-                canvas.itemconfigure("pedestrian_red", fill="black")
-                canvas.itemconfigure("pedestrian_green", fill="green")
-    elif pedestrian_light_state == "green":
-        # Обновляем цвета сигналов
-        canvas.itemconfigure("pedestrian_red", fill="black")
-        canvas.itemconfigure("pedestrian_green", fill="green")
+
+                # Перерисовываем светофор для пешехода
+                canvas.delete("pedestrian_light")
+                canvas.create_oval(
+                    pedestrian_light_x + 115, pedestrian_light_y + 5,
+                    pedestrian_light_x + 150, pedestrian_light_y + 40,
+                    fill="green", tags="pedestrian_light"
+                )
+
+    else:
+        # Зелёный сигнал для пешеходов
+        canvas.create_oval(
+            pedestrian_light_x + 115, pedestrian_light_y + 5,
+            pedestrian_light_x + 150, pedestrian_light_y + 40,
+            fill="green", tags="pedestrian_light"
+        )
+
         if timer_running:
-            timer_value -= elapsed_time
+            timer_value -= delta
+
+            # Возврат в исходное состояние
             if timer_value <= 0:
-                pedestrian_light_state = "red"
-                driver_light_state = "green"
+                pedestrian_light_state, driver_light_state = "red", "green"
                 timer_value = 0
                 waiting_for_green = False
-                # Переключаем сигналы
-                canvas.itemconfigure("pedestrian_red", fill="red")
-                canvas.itemconfigure("pedestrian_green", fill="black")
 
-    # Обновляем светофоры для водителей
+    # === Обновление сигналов для водителей ===
     draw_driver_lights()
 
-    # Обновляем пешеходов
-    for pedestrian in pedestrians:
-        if pedestrian_light_state == "green" and pedestrian.y <= pedestrian.target_y:
-            pedestrian.waiting = False
-        pedestrian.move()
+    # === Обновление движения пешеходов ===
+    for person in pedestrians:
+        if pedestrian_light_state == "green" and person.y <= person.target_y:
+            person.waiting = False
+        person.move()
+
+    # Удаляем завершивших переход
     pedestrians[:] = [p for p in pedestrians if p.state != "crossed"]
 # 👨‍💻 Никита Кочнев — конец
 
@@ -418,7 +493,7 @@ def update_lights():
     if timer_running or pedestrian_light_state == "green":
         color = "green" if pedestrian_light_state == "green" else "red"
         if timer_text_id is None:
-            timer_text_id = canvas.create_text(pedestrian_light_x + 22, pedestrian_light_y + 45,
+            timer_text_id = canvas.create_text(pedestrian_light_x + 75, pedestrian_light_y + 25,
                                                text=f"{timer_value:.1f}", font=("Arial", 16), fill=color, tags="timer")
         else:
             canvas.itemconfigure(timer_text_id, text=f"{timer_value:.1f}", fill=color)
@@ -430,16 +505,23 @@ def update_lights():
 
 # 👨‍💻 Никита Кочнев — начало
     if timer_running:
+        # Продолжаем обновление цикла через 100 мс
         canvas.after(100, update_lights)
     else:
+        # Приостановка таймера — обновляем визуальное состояние
         draw_driver_lights()
-        # Сохраняем текущее состояние при паузе
+
+        ped_x, ped_y = pedestrian_light_x, pedestrian_light_y
+        red_area = (ped_x + 5, ped_y + 5, ped_x + 40, ped_y + 40)
+        green_area = (ped_x + 115, ped_y + 5, ped_x + 150, ped_y + 40)
+
+        # Рисуем сигналы пешеходного светофора в зависимости от состояния
         if pedestrian_light_state == "red":
-            canvas.itemconfigure("pedestrian_red", fill="red")
-            canvas.itemconfigure("pedestrian_green", fill="black")
+            canvas.create_oval(*red_area, fill="red", tags="pedestrian_light")
+            canvas.create_oval(*green_area, fill="black", tags="pedestrian_light")
         else:
-            canvas.itemconfigure("pedestrian_red", fill="black")
-            canvas.itemconfigure("pedestrian_green", fill="green")
+            canvas.create_oval(*red_area, fill="black", tags="pedestrian_light")
+            canvas.create_oval(*green_area, fill="green", tags="pedestrian_light")
 # 👨‍💻 Никита Кочнев — конец
 
 
@@ -447,8 +529,7 @@ def update_lights():
     # Устанавливаем порядок слоев
     canvas.tag_raise("traffic_light")
     canvas.tag_raise("timer")
-    canvas.tag_raise("pedestrian_red")
-    canvas.tag_raise("pedestrian_green")
+    canvas.tag_raise("pedestrian_light")
     canvas.tag_raise("driver_light")
 # 👨‍💻 Никита Лаптев — конец
 
@@ -481,18 +562,15 @@ def draw_traffic_lights():
     canvas.create_rectangle(driver_light_x_right, driver_light_y, driver_light_x_right + 30, driver_light_y + 90,
                             fill="black", tags="traffic_light")
 
-    # Пешеходный светофор — ВЕРТИКАЛЬНО, на тротуаре (слева от дороги)
-    pedestrian_light_x = canvas_width // 2 - 300  # Сдвинули влево
-    pedestrian_light_y = line_y - 250             # Сдвинули вверх
-    canvas.create_rectangle(pedestrian_light_x, pedestrian_light_y, pedestrian_light_x + 45, pedestrian_light_y + 100,
+    pedestrian_light_x = canvas_width // 2 - 60
+    pedestrian_light_y = line_y - 30
+    canvas.create_rectangle(pedestrian_light_x, pedestrian_light_y, pedestrian_light_x + 155, pedestrian_light_y + 45,
                             fill="black", tags="traffic_light")
 
-    # Красный сигнал — сверху
     canvas.create_oval(pedestrian_light_x + 5, pedestrian_light_y + 5, pedestrian_light_x + 40,
-                       pedestrian_light_y + 40, fill="red", tags="pedestrian_red")
-    # Зелёный сигнал — снизу
-    canvas.create_oval(pedestrian_light_x + 5, pedestrian_light_y + 50, pedestrian_light_x + 40,
-                       pedestrian_light_y + 85, fill="black", tags="pedestrian_green")
+                       pedestrian_light_y + 40, fill="red", tags="pedestrian_light")
+    canvas.create_oval(pedestrian_light_x + 115, pedestrian_light_y + 5, pedestrian_light_x + 150,
+                       pedestrian_light_y + 40, fill="black", tags="pedestrian_light")
 
     draw_driver_lights()
 
@@ -531,8 +609,7 @@ def update_canvas(event):
     canvas.tag_raise("car")
     canvas.tag_raise("traffic_light")
     canvas.tag_raise("timer")
-    canvas.tag_raise("pedestrian_red")
-    canvas.tag_raise("pedestrian_green")
+    canvas.tag_raise("pedestrian_light")
     canvas.tag_raise("driver_light")
 # 👨‍💻 Никита Лаптев — конец
 
@@ -546,28 +623,38 @@ canvas.bind("<Configure>", update_canvas)
 # 👨‍💻 Никита Кочнев — начало
 def spawn_cars():
     global last_car_spawn_time
-    if not simulation_started or not timer_running:
+
+    # Проверяем активность симуляции и таймера
+    if not (simulation_started and timer_running):
         return
 
-    current_time = time.time()
-    if current_time - last_car_spawn_time >= car_spawn_interval:
-        canvas_width = canvas.winfo_width()
-        canvas_height = canvas.winfo_height()
+    now = time.time()
+    time_gap = now - last_car_spawn_time
 
-        if len([car for car in cars if car.direction == "left"]) < 3:
-            random_car_index = random.randint(0,
-                                              len(car_images) // 2 - 1) * 2 + 1
-            new_car = Car(canvas, canvas_width, canvas_height // 2 - 125, "left", car_images[random_car_index])
-            cars.append(new_car)
+    # Проверяем интервал появления машин
+    if time_gap >= car_spawn_interval:
+        w, h = canvas.winfo_width(), canvas.winfo_height()
 
-        if len([car for car in cars if car.direction == "right"]) < 3:
-            random_car_index = random.randint(0,
-                                              len(car_images) // 2 - 1) * 2
-            new_car = Car(canvas, -250, canvas_height // 2 + 50, "right", car_images[random_car_index])
-            cars.append(new_car)
+        # === Спавн машин, движущихся влево ===
+        left_side_cars = [c for c in cars if c.direction == "left"]
+        if len(left_side_cars) < 3:
+            idx = random.randrange(0, len(car_images) // 2) * 2 + 1
+            y_pos = h // 2 - 125
+            new_left_car = Car(canvas, w, y_pos, "left", car_images[idx])
+            cars.append(new_left_car)
 
-        last_car_spawn_time = current_time
+        # === Спавн машин, движущихся вправо ===
+        right_side_cars = [c for c in cars if c.direction == "right"]
+        if len(right_side_cars) < 3:
+            idx = random.randrange(0, len(car_images) // 2) * 2
+            y_pos = h // 2 + 50
+            new_right_car = Car(canvas, -250, y_pos, "right", car_images[idx])
+            cars.append(new_right_car)
 
+        # Обновляем время последнего спавна
+        last_car_spawn_time = now
+
+    # Продолжаем цикл спавна, если таймер активен
     if timer_running:
         canvas.after(1000, spawn_cars)
 # 👨‍💻 Никита Кочнев — конец
