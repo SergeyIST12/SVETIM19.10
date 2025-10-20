@@ -125,7 +125,7 @@ class Car:
 # 👨‍💻 Марсель — конец
 
 
-# 👩‍🎓 Аня — начало
+# 👩‍🎓 Аня — начало(поведение людей)
 class Pedestrian:
     def __init__(self, canvas, image_path, x, y):
         self.canvas = canvas
@@ -135,24 +135,32 @@ class Pedestrian:
         # Позиция и движение
         self.x, self.y = x, y
         self.crosswalk_center_y = canvas.winfo_height() // 2
-        self.target_y = self.crosswalk_center_y + road_height // 2 + 20
+        self.target_y = self.crosswalk_center_y + road_height // 2 + 1
 
         self.base_speed = 2
         self.current_speed = self.base_speed
         self.crossing_speed = self.base_speed
         self.acceleration = 0.1
-        self.x_shift = random.uniform(-0.5, 0.5)
+        self.x_shift = random.uniform(-0.05, 0.05)
 
         # Поведение и ограничения
         self.relaxed_speed = self.base_speed * 0.7
         self.hurry_threshold = 5
         self.state = "walking_to_crosswalk"
-        self.min_x = 50
-        self.max_x = canvas.winfo_width() - 50
+                # Ширина тротуара — от левого края до правого края, но с отступом от забора
+        self.min_x = 80  # отступ от левого края
+        self.max_x = canvas.winfo_width() - 80  # отступ от правого края
+                # Координаты тротуара (примерные)
+        trotoar_left = 0
+        trotoar_right = canvas.winfo_width()
+
+        # Добавляем небольшие отступы от краёв (чтобы не прижимались к деревьям)
+        self.min_x = trotoar_left - 1000
+        self.max_x = trotoar_right - 700
 
     def move(self):
         global timer_value, pedestrian_light_state
-
+        
         # === Идёт к переходу ===
         if self.state == "walking_to_crosswalk":
             if self.y > self.target_y:
@@ -191,13 +199,14 @@ class Pedestrian:
                 target_speed = self.base_speed * 0.5
                 if self.current_speed > target_speed:
                     self.current_speed = max(self.current_speed - self.acceleration, target_speed)
-                new_x = max(self.min_x, min(self.max_x, self.x + self.x_shift))
+                new_x = max(self.min_x, min(self.max_x, self.x))
                 self.canvas.move(self.id, new_x - self.x, -self.current_speed)
                 self.x, self.y = new_x, self.y - self.current_speed
             else:
                 # Удаляем с холста и помечаем как завершённого
                 self.canvas.delete(self.id)
                 self.state = "crossed"
+
 # 👩‍🎓 Аня — конец
 
 
@@ -210,14 +219,14 @@ def load_pedestrian_models(canvas):
         "assets/people/model2.png",
         "assets/people/model3.png"
     ]
-    crosswalk_start = canvas.winfo_width() // 2 - 130
+    crosswalk_start = canvas.winfo_width() // 2 - 110
     crosswalk_end = canvas.winfo_width() // 2 + 150
     crosswalk_width = crosswalk_end - crosswalk_start
     spacing = crosswalk_width // (len(models) + 1)
 
     for i, model in enumerate(models, 1):
         x = crosswalk_start + i * spacing
-        y = canvas.winfo_height() + 50 + i * 50
+        y = canvas.winfo_height() + 40 + i * 40
         pedestrian = Pedestrian(canvas, model, x, y)
         pedestrians.append(pedestrian)
 
@@ -333,16 +342,13 @@ def exit_application():
 # Кнопки в меню
 buttons = {
     "Начать симуляцию": start_simulation,
-    "Приостановить": pause_simulation,
-    "Продолжить": resume_simulation,
     "Закончить симуляцию": stop_simulation,
-    "Настройки": open_settings,
     "Выход": exit_application,
 }
 
 # Создаем и размещаем кнопки
 for btn_text, func in buttons.items():
-    button = tk.Button(menu_frame, text=btn_text, command=func, font=("Arial", 12), height=2, width=20)
+    button = tk.Button(menu_frame, text=btn_text, command=func, font=("Arial", 15), height=3, width=20)
     button.pack(pady=5)
 # 👩‍💻 Дарья Лексина — конец
 
@@ -383,10 +389,12 @@ def draw_crosswalk():
 
     y = crosswalk_start_y
     while y < crosswalk_end_y:
+        # Чёрная полоса
         canvas.create_rectangle(crosswalk_x, y, crosswalk_x + crosswalk_width, min(y + 30, crosswalk_end_y),
-                                fill="yellow", tags="crosswalk")
+                                fill="black", tags="crosswalk")
         y += 30
         if y < crosswalk_end_y:
+            # Белая полоса
             canvas.create_rectangle(crosswalk_x, y, crosswalk_x + crosswalk_width, min(y + 30, crosswalk_end_y),
                                     fill="white", tags="crosswalk")
             y += 30
@@ -431,7 +439,7 @@ def update_lights():
 
     # === Обработка состояния пешеходного светофора ===
     if pedestrian_light_state == "red":
-        # Красный сигнал для пешеходов
+        # Красный сигнал для пешеходов (верхний)
         canvas.create_oval(
             pedestrian_light_x + 5, pedestrian_light_y + 5,
             pedestrian_light_x + 40, pedestrian_light_y + 40,
@@ -450,19 +458,19 @@ def update_lights():
                 pedestrian_light_state, driver_light_state = "green", "red"
                 timer_value = green_duration
 
-                # Перерисовываем светофор для пешехода
-                canvas.delete("pedestrian_light")
+                # Перерисовываем светофор для пешехода (зеленый в нижнем положении)
+                canvas.delete("pedestrian_light") # Удаляем предыдущий
                 canvas.create_oval(
-                    pedestrian_light_x + 115, pedestrian_light_y + 5,
-                    pedestrian_light_x + 150, pedestrian_light_y + 40,
+                    pedestrian_light_x + 5, pedestrian_light_y + 60, # <-- ИСПРАВЛЕНО: +5, +60
+                    pedestrian_light_x + 40, pedestrian_light_y + 95,
                     fill="green", tags="pedestrian_light"
                 )
 
     else:
-        # Зелёный сигнал для пешеходов
+        # Зелёный сигнал для пешеходов (нижний)
         canvas.create_oval(
-            pedestrian_light_x + 115, pedestrian_light_y + 5,
-            pedestrian_light_x + 150, pedestrian_light_y + 40,
+            pedestrian_light_x + 5, pedestrian_light_y + 60, # <-- ИСПРАВЛЕНО: +5, +60
+            pedestrian_light_x + 40, pedestrian_light_y + 95,
             fill="green", tags="pedestrian_light"
         )
 
@@ -486,7 +494,6 @@ def update_lights():
 
     # Удаляем завершивших переход
     pedestrians[:] = [p for p in pedestrians if p.state != "crossed"]
-# 👨‍💻 Никита Кочнев — конец
 
 
 # 👩‍💻 Дарья Лексина — начало
@@ -539,7 +546,15 @@ def update_lights():
 button_frame = tk.Frame(menu_frame)
 button_frame.pack(pady=20)
 
-pedestrian_button = tk.Button(button_frame, text="Переключить пешеходный свет", command=start_pedestrian_timer)
+pedestrian_button = tk.Button(
+    button_frame,
+    text="Включить пешеходный светофор",
+    command=start_pedestrian_timer,
+    width=28,
+    height=2,
+    bg="#ccffcc",
+    font=("Arial", 11, "bold")
+)
 pedestrian_button.pack()
 # 👩‍💻 Дарья Лексина — конец
 
@@ -562,16 +577,21 @@ def draw_traffic_lights():
     canvas.create_rectangle(driver_light_x_right, driver_light_y, driver_light_x_right + 30, driver_light_y + 90,
                             fill="black", tags="traffic_light")
 
-    pedestrian_light_x = canvas_width // 2 - 60
-    pedestrian_light_y = line_y - 30
-    canvas.create_rectangle(pedestrian_light_x, pedestrian_light_y, pedestrian_light_x + 155, pedestrian_light_y + 45,
+      # Пешеходный светофор — вертикально, слева от дороги
+    pedestrian_light_x = canvas_width // 2 - 300  # Сдвинули влево — на тротуар
+    pedestrian_light_y = line_y - 250  # Сдвинули вверх — выше дороги
+    canvas.create_rectangle(pedestrian_light_x, pedestrian_light_y, pedestrian_light_x + 45, pedestrian_light_y + 100,
                             fill="black", tags="traffic_light")
 
-    canvas.create_oval(pedestrian_light_x + 5, pedestrian_light_y + 5, pedestrian_light_x + 40,
-                       pedestrian_light_y + 40, fill="red", tags="pedestrian_light")
-    canvas.create_oval(pedestrian_light_x + 115, pedestrian_light_y + 5, pedestrian_light_x + 150,
-                       pedestrian_light_y + 40, fill="black", tags="pedestrian_light")
+    # Красный сигнал — сверху
+    canvas.create_oval(pedestrian_light_x + 5, pedestrian_light_y + 5, 
+                       pedestrian_light_x + 40, pedestrian_light_y + 40, 
+                       fill="red", tags="pedestrian_red")
 
+    # Зелёный сигнал — снизу
+    canvas.create_oval(pedestrian_light_x + 5, pedestrian_light_y + 60, 
+                       pedestrian_light_x + 40, pedestrian_light_y + 95, 
+                       fill="black", tags="pedestrian_green")
     draw_driver_lights()
 
 
@@ -699,34 +719,35 @@ def move_cars():
         return
 
     for car in cars:
-        if not car.is_on_crosswalk():
-            if (driver_light_state in ["red", "yellow"] and car.is_at_stop_line() and not car.is_past_stop_line()) or car.is_near_pedestrian(pedestrians):
-                car.stop()
-            elif driver_light_state == "green" or car.is_past_stop_line():
-                car.resume()
-        else:
-            if car.is_near_pedestrian(pedestrians):
-                car.stop()
-            else:
-                car.resume()
-
-        car.move()
-
-        # Проверка на столкновение с другими машинами
+        if car.is_near_pedestrian(pedestrians):
+            car.stop()
+            continue
+            
+        car_should_stop = False
         for other_car in cars:
             if car != other_car and car.direction == other_car.direction:
                 if car.direction == "left":
-                    if car.x - (other_car.x + 150) < 50 and car.x > other_car.x:
-                        car.stop()
+                    if other_car.x < car.x and car.x - (other_car.x + 150) < 100:
+                        car_should_stop = True
                         break
-                else:
-                    if other_car.x - (car.x + 150) < 50 and car.x < other_car.x:
-                        car.stop()
+                else:  
+                    if other_car.x > car.x and other_car.x - (car.x + 150) < 100:
+                        car_should_stop = True
                         break
+        
+        if car_should_stop:
+            car.stop()
+            continue
+            
+        if not car.is_on_crosswalk():
+            if driver_light_state in ["red", "yellow"] and car.is_at_stop_line() and not car.is_past_stop_line():
+                car.stop()
+            else:
+                car.resume()
         else:
-            if not car.is_at_stop_line() and not car.is_near_pedestrian(pedestrians):
-                if driver_light_state == "green" or car.is_on_crosswalk():
-                    car.resume()
+            car.resume()
+
+        car.move()
 
     cars[:] = [car for car in cars if not car.is_off_screen()]
 
