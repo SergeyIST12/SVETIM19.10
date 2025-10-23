@@ -252,31 +252,6 @@ def start_simulation():
     print("Симуляция начата")
 
 
-def pause_simulation():
-    global timer_running
-    if not simulation_started:
-        messagebox.showinfo("Внимание", "Необходимо начать симуляцию")
-        return
-    timer_running = False
-    print("Симуляция приостановлена")
-
-
-def resume_simulation():
-    global timer_running, last_update_time
-    if not simulation_started:
-        messagebox.showinfo("Внимание", "Необходимо начать симуляцию")
-        return
-    if timer_running:
-        return
-    timer_running = True
-    last_update_time = time.time()
-    update_lights()
-    move_cars()
-    spawn_cars()
-    spawn_pedestrians()
-    print("Симуляция продолжается")
-
-
 def stop_simulation():
     global timer_running, pedestrian_light_state, driver_light_state, timer_value, waiting_for_green, simulation_started, cars, pedestrians
     timer_running = False
