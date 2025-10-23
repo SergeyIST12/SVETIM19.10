@@ -1,2 +1,2 @@
-# SVETIM19.10
-Update - 19.10.25
+# SVETIM23.10
+Update - 23.10.25
