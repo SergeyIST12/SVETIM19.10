@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import simpledialog, messagebox, PhotoImage
+from tkinter import messagebox, PhotoImage
 import time
 from PIL import Image, ImageTk
 import random
@@ -147,10 +147,10 @@ class Pedestrian:
         self.relaxed_speed = self.base_speed * 0.7
         self.hurry_threshold = 5
         self.state = "walking_to_crosswalk"
-                # Ширина тротуара — от левого края до правого края, но с отступом от забора
+        # Ширина тротуара — от левого края до правого края, но с отступом от забора
         self.min_x = 80  # отступ от левого края
         self.max_x = canvas.winfo_width() - 80  # отступ от правого края
-                # Координаты тротуара (примерные)
+        # Координаты тротуара (примерные)
         trotoar_left = 0
         trotoar_right = canvas.winfo_width()
 
@@ -295,45 +295,6 @@ def stop_simulation():
     print("Симуляция завершена")
 # 👩‍💼 Сергей (тимлид) — конец
 
-
-# 🧪 Дина (инженер тестировщик) — начало
-def open_settings():
-    global green_duration, red_duration
-    settings_window = tk.Toplevel(root)
-    settings_window.title("Настройки")
-
-    tk.Label(settings_window, text="Длительность зеленого сигнала (в секундах):").grid(row=0, column=0, padx=5, pady=5)
-    green_entry = tk.Entry(settings_window)
-    green_entry.insert(0, str(green_duration))
-    green_entry.grid(row=0, column=1, padx=5, pady=5)
-
-    tk.Label(settings_window, text="Длительность красного сигнала (в секундах):").grid(row=1, column=0, padx=5, pady=5)
-    red_entry = tk.Entry(settings_window)
-    red_entry.insert(0, str(red_duration))
-    red_entry.grid(row=1, column=1, padx=5, pady=5)
-
-    def save_settings():
-        global green_duration, red_duration
-        try:
-            new_green_duration = int(green_entry.get())
-            new_red_duration = int(red_entry.get())
-            if new_green_duration <= 0 or new_red_duration <= 0:
-                raise ValueError("Значения должны быть положительными")
-            green_duration = new_green_duration
-            red_duration = new_red_duration
-            for pedestrian in pedestrians:
-                if pedestrian.state == "crossing_road":
-                    distance_to_cross = road_height
-                    pedestrian.speed = distance_to_cross / (green_duration * 10)
-            settings_window.destroy()
-            messagebox.showinfo("Настройки сохранены",
-                                "Для применения новых настроек необходимо перезапустить симуляцию")
-        except ValueError:
-            messagebox.showerror("Ошибка", "Пожалуйста, введите положительные целые числа (отличные от нуля)")
-
-    tk.Button(settings_window, text="Сохранить", command=save_settings).grid(row=2, column=0, columnspan=2, pady=10)
-# 🧪 Дина (инженер тестировщик) — конец
-
 def exit_application():
     if messagebox.askokcancel("Выход", "Вы уверены, что хотите выйти?"):
         root.quit()
@@ -461,7 +422,7 @@ def update_lights():
                 # Перерисовываем светофор для пешехода (зеленый в нижнем положении)
                 canvas.delete("pedestrian_light") # Удаляем предыдущий
                 canvas.create_oval(
-                    pedestrian_light_x + 5, pedestrian_light_y + 60, # <-- ИСПРАВЛЕНО: +5, +60
+                    pedestrian_light_x + 5, pedestrian_light_y + 60,
                     pedestrian_light_x + 40, pedestrian_light_y + 95,
                     fill="green", tags="pedestrian_light"
                 )
@@ -469,7 +430,7 @@ def update_lights():
     else:
         # Зелёный сигнал для пешеходов (нижний)
         canvas.create_oval(
-            pedestrian_light_x + 5, pedestrian_light_y + 60, # <-- ИСПРАВЛЕНО: +5, +60
+            pedestrian_light_x + 5, pedestrian_light_y + 60,
             pedestrian_light_x + 40, pedestrian_light_y + 95,
             fill="green", tags="pedestrian_light"
         )
